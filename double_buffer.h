@@ -103,14 +103,6 @@ private:
       }
     }
 
-    void _lock_active() {
-      _apply_state_mask(CONSUMER_NOT_DONE_MASK);
-    }
-
-    void _unlock_active() {
-      _clear_state_mask(CONSUMER_NOT_DONE_MASK);
-    }
-
     void _flip() {
       uint16_t state = _state.load();
       uint16_t desired;

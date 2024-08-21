@@ -29,12 +29,13 @@ protected:
     virtual void generate_done() = 0;
 };
 
-template <typename T>
+template <typename T, typename YieldF = void (*)()>
 class DoubleBuffer : public DoubleBufferReader<T>, public DoubleBufferWriter<T> {
 public:
     using DataT = T;
+    using Yielder = YieldF;
 
-    DoubleBuffer() : _state{0} {}
+    DoubleBuffer(Yielder &&yield) : _yield{yield}, _state{0} {}
 
 protected:
     DataT *generate() override {
@@ -66,6 +67,7 @@ private:
     static constexpr int BUFFER_COUNT = 2;
 
     DataT _buffer[BUFFER_COUNT];
+    Yielder _yield;
 
     // bit 7 = consumer not done
     // bit 6 = generator not done
@@ -90,6 +92,9 @@ private:
       uint16_t desired = state | or_mask;
 
       while (!_state.compare_exchange_weak(state, desired)) {
+        _yield();
+
+        state = _state.load();
         desired = state | or_mask;
       }
     }
@@ -99,6 +104,9 @@ private:
       uint16_t desired = state & (~clr_mask);
 
       while (!_state.compare_exchange_weak(state, desired)) {
+        _yield();
+
+        state = _state.load();
         desired = state & (~clr_mask);
       }
     }
@@ -115,7 +123,13 @@ private:
           desired = state ^ ACTIVE_IDX_MASK;
           desired &= ~SHOULD_FLIP_MASK;
 
-          _state.compare_exchange_strong(state, desired);
+          while (!_state.compare_exchange_weak(state, desired)) {
+            _yield();
+
+            state = _state.load();
+            desired = state ^ ACTIVE_IDX_MASK;
+            desired &= ~SHOULD_FLIP_MASK;
+          }
 
           break;
         }

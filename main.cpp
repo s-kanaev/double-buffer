@@ -71,7 +71,7 @@ int main() {
   std::thread thr1, thr2;
 
   std::atomic<bool> cont{true};
-  DB db;
+  DB db{&std::this_thread::yield};
 
   thr1 = std::thread([&db, &cont] () { producer(cont, db); });
   thr2 = std::thread([&db, &cont] () { consumer(cont, db); });
